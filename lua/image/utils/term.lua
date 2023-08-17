@@ -52,4 +52,7 @@ return {
   get_size = function()
     return cached_size
   end,
+  -- the Kitty image protocol support in WezTerm is buggy, which needs workaround
+  is_wezterm = vim.env.WEZTERM_EXECUTABLE ~= nil,
+  is_tmux = vim.env.TMUX ~= nil
 }

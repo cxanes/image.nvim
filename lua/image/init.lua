@@ -11,12 +11,13 @@ local default_options = {
       enabled = true,
       sizing_strategy = "auto",
       download_remote_images = true,
-      clear_in_insert_mode = false,
+      -- WezTerm may not render correclty in insert mode
+      clear_in_insert_mode = utils.term.is_wezterm,
     },
     neorg = {
       enabled = true,
       download_remote_images = true,
-      clear_in_insert_mode = false,
+      clear_in_insert_mode = utils.term.is_wezterm,
     },
   },
   max_width = nil,
@@ -204,7 +205,7 @@ api.setup = function(options)
   vim.api.nvim_create_autocmd("WinScrolled", {
     group = group,
     callback = function(au)
-      local images = api.get_images({ window = tonumber(au.file) })
+      local images = api.get_images({ buffer = tonumber(au.buffer) })
       for _, current_image in ipairs(images) do
         current_image:render()
       end
@@ -249,6 +250,7 @@ api.get_images = function(opts)
   for _, current_image in pairs(state.images) do
     if
       (opts and opts.window and opts.window == current_image.window and not opts.buffer)
+      or (opts and opts.buffer and opts.buffer == current_image.buffer and not opts.window)
       or (opts and opts.window and opts.window == current_image.window and opts.buffer and opts.buffer == current_image.buffer)
       or not opts
     then

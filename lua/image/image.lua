@@ -31,7 +31,7 @@ function Image:render(geometry)
   if geometry then self.geometry = vim.tbl_deep_extend("force", self.geometry, geometry) end
 
   -- utils.debug(("---------------- %s ----------------"):format(self.id))
-  local was_rendered = renderer.render(self)
+  local was_rendered, callback = renderer.render(self)
 
   -- utils.debug( ("[image] render: %s, success: %s x: %s, y: %s, width: %s, height: %s"):format( self.id, was_rendered, self.geometry.x, self.geometry.y, self.geometry.width, self.geometry.height))
 
@@ -57,7 +57,12 @@ function Image:render(geometry)
 
     -- create extmark if outdated or it doesn't exist
     if was_rendered and previous_extmark then
-      if previous_extmark.height == height then return end
+      if previous_extmark.height == height then
+        if utils.term.is_wezterm and callback ~= nil then
+          callback()
+        end
+        return
+      end
       vim.api.nvim_buf_del_extmark(self.buffer, self.global_state.extmarks_namespace, previous_extmark.id)
     end
     if was_rendered then
@@ -71,6 +76,10 @@ function Image:render(geometry)
         virt_lines = filler,
       })
       buf_extmark_map[self.buffer .. ":" .. row] = { id = self.internal_id, height = height }
+    end
+
+    if utils.term.is_wezterm and callback ~= nil then
+      callback()
     end
 
     -- TODO: chain rerendering only the next affected image after this one

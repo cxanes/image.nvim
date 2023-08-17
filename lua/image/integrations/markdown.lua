@@ -130,14 +130,23 @@ local render = vim.schedule_wrap(
 local setup_autocommands = function(ctx)
   local group = vim.api.nvim_create_augroup("image.nvim:markdown", { clear = true })
 
-  vim.api.nvim_create_autocmd({
-    "WinNew",
-    "BufWinEnter",
-    "WinResized",
-  }, {
+  local renderEvents = {
+      "WinNew",
+      "BufWinEnter",
+      "WinResized",
+  }
+
+  if utils.term.is_tmux then
+    -- when moving back to this window, should rerender all images
+    renderEvents[#renderEvents + 1] = "FocusGained"
+  end
+
+  vim.api.nvim_create_autocmd(renderEvents,
+  {
     group = group,
     callback = function(args)
       if vim.bo[args.buf].filetype ~= "markdown" then return end
+      if string.find(vim.api.nvim_get_mode().mode, "i", 1, true) ~= nil and ctx.options.clear_in_insert_mode then return end
       render(ctx)
     end,
   })
@@ -154,6 +163,9 @@ local setup_autocommands = function(ctx)
     end,
   })
 
+  -- use this variable in case autocmds is triggered too frequently
+  local in_insert_ender_callback = false
+
   if ctx.options.clear_in_insert_mode then
     vim.api.nvim_create_autocmd({
       "InsertEnter",
@@ -161,11 +173,14 @@ local setup_autocommands = function(ctx)
       group = group,
       callback = function(args)
         if vim.bo[args.buf].filetype ~= "markdown" then return end
+        if in_insert_ender_callback then return end
+        in_insert_ender_callback = true
         local current_window = vim.api.nvim_get_current_win()
         local images = ctx.api.get_images({ window = current_window })
         for _, image in ipairs(images) do
           image:clear()
         end
+        in_insert_ender_callback = false
       end,
     })
 

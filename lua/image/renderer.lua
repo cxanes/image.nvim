@@ -129,7 +129,8 @@ local render = function(image)
     bounds = {
       top = window.y + global_offsets.y,
       right = window.x + window.width - global_offsets.x,
-      bottom = window.y + window.height - global_offsets.y,
+      -- minus one to prevent image is overlapped with status line
+      bottom = window.y + window.height - global_offsets.y - 1,
       left = window.x + global_offsets.x,
     }
 
@@ -378,11 +379,24 @@ local render = function(image)
   -- })
 
   image.bounds = bounds
-  state.backend.render(image, absolute_x, absolute_y, width, height)
+  local render = function()
+    state.backend.render(image, absolute_x, absolute_y, width, height)
+  end
   image.rendered_geometry = rendered_geometry
   -- utils.debug("rendered", image)
 
-  return true
+  if utils.term.is_wezterm and image.buffer and image.with_virtual_padding then
+    return true, function ()
+      -- in WezTerm, image could be rendered before rendering extmark,
+      -- which may cause image tearing, so we force it to redraw to make sure
+      -- extmark is rendered first
+      vim.cmd('redraw!')
+      render()
+    end
+  else
+    render()
+    return true
+  end
 end
 
 return {

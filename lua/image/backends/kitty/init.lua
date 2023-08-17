@@ -2,12 +2,12 @@ local utils = require("image/utils")
 local codes = require("image/backends/kitty/codes")
 local helpers = require("image/backends/kitty/helpers")
 
-local is_tmux = vim.env.TMUX ~= nil
 local tmux_has_passthrough = false
 
-if is_tmux then
+if utils.term.is_tmux then
   local ok, result = pcall(vim.fn.system, "tmux show -Apv allow-passthrough")
-  if ok and result == "on\n" then tmux_has_passthrough = true end
+  -- need https://github.com/tmux/tmux/commit/42ba6c1b229c92256274e848e9c5ff1d59d9081b to clear image when focus is lost
+  if ok and (result == "on\n" or result == "all\n") then tmux_has_passthrough = true end
 end
 
 ---@type Backend
@@ -15,7 +15,8 @@ local backend = {
   ---@diagnostic disable-next-line: assign-type-mismatch
   state = nil,
   features = {
-    crop = true,
+    -- WezTerm cannot handle crop correctly
+    crop = not utils.term.is_wezterm
   },
 }
 
@@ -23,7 +24,7 @@ local backend = {
 local transmitted_images = {}
 backend.setup = function(state)
   backend.state = state
-  if is_tmux and not tmux_has_passthrough then
+  if utils.term.is_tmux and not tmux_has_passthrough then
     utils.throw("tmux does not have allow-passthrough enabled")
     return
   end
@@ -49,6 +50,17 @@ backend.setup = function(state)
       backend.clear()
     end,
   })
+
+  if utils.term.is_tmux then
+    -- we may switch to different window in tmux, in such case we should clear all rendered images on screen
+    vim.api.nvim_create_autocmd("FocusLost", {
+      callback = function()
+        for _, image in pairs(backend.state.images) do
+          image:clear()
+        end
+      end,
+    })
+  end
 end
 
 backend.render = function(image, x, y, width, height)
